@@ -4,7 +4,7 @@ import GoogleMobileAds
 @main
 struct DigitalKujiApp: App {
     init() {
-        MobileAds.shared.start(completionHandler: nil)
+        GADMobileAds.sharedInstance().start(completionHandler: nil)
     }
 
     var body: some Scene {

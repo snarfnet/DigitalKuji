@@ -1,4 +1,4 @@
-name: Build & Upload to App Store
+name: Build and Upload to App Store
 
 on:
   push:
@@ -7,95 +7,84 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "15.4"
+    - name: Select Xcode 26
+      run: |
+        XCODE_APP=$(ls /Applications/ | grep -E "^Xcode_2[6-9]|^Xcode_[3-9][0-9]" | sort -V | tail -1)
+        if [ -n "$XCODE_APP" ]; then
+          sudo xcode-select -s "/Applications/$XCODE_APP"
+        else
+          XCODE_APP=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE_APP"
+        fi
+        xcodebuild -version
 
-      - name: Install xcodegen
-        run: brew install xcodegen
+    - name: Install XcodeGen
+      run: brew install xcodegen
 
-      - name: Generate Xcode project
-        run: xcodegen generate
+    - name: Set build number
+      run: |
+        BUILD_NUM=$(( ${{ github.run_number }} + 0 ))
+        echo "BUILD_NUM=$BUILD_NUM" >> $GITHUB_ENV
+        sed -i "" "s/CURRENT_PROJECT_VERSION: [0-9]*/CURRENT_PROJECT_VERSION: $BUILD_NUM/" project.yml
 
-      - name: Install certificate
-        env:
-          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-        run: |
-          echo "$CERTIFICATE_P12" | base64 --decode > certificate.p12
-          security create-keychain -p "" build.keychain
-          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -s build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+    - name: Generate Xcode project
+      run: xcodegen generate
 
-      - name: Install provisioning profile
-        env:
-          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
-        run: |
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$PROVISIONING_PROFILE" | base64 --decode \
-            > ~/Library/MobileDevice/Provisioning\ Profiles/DigitalKuji.mobileprovision
+    - name: Import Distribution Certificate
+      env:
+        CERT_BASE64: ${{ secrets.DIST_CERT_BASE64 }}
+        CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      run: |
+        security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+        security set-keychain-settings -t 3600 -u build.keychain
+        echo "$CERT_BASE64" | base64 -D > cert.p12
+        security import cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+        rm cert.p12
 
-      - name: Build & Archive
-        env:
-          PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.PROVISIONING_PROFILE_NAME }}
-        run: |
-          xcodebuild archive \
-            -project DigitalKuji.xcodeproj \
-            -scheme DigitalKuji \
-            -configuration Release \
-            -archivePath build/DigitalKuji.xcarchive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=83VGKGSQUH \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.PROVISIONING_PROFILE_NAME }}"
+    - name: Set up ASC API Key
+      env:
+        ASC_API_KEY_CONTENT: ${{ secrets.ASC_API_KEY_CONTENT }}
+      run: |
+        mkdir -p ~/.appstoreconnect/private_keys
+        echo "$ASC_API_KEY_CONTENT" | base64 -D > ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8
+        cp ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8 /tmp/asc_key.p8
 
-      - name: Export IPA
-        run: |
-          cat > ExportOptions.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>teamID</key>
-            <string>83VGKGSQUH</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.tokyonasu.digitalkuji</key>
-              <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
-            </dict>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath build/DigitalKuji.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath build/
+    - name: Build Archive
+      run: |
+        xcodebuild archive \
+          -scheme DigitalKuji \
+          -configuration Release \
+          -destination "generic/platform=iOS" \
+          -archivePath build/DigitalKuji.xcarchive \
+          CODE_SIGN_STYLE=Automatic \
+          DEVELOPMENT_TEAM=83VGKGSQUH \
+          -allowProvisioningUpdates \
+          -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8 \
+          -authenticationKeyID WDXGY9WX55 \
+          -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
 
-      - name: Upload to App Store Connect
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
-        run: |
-          echo "$ASC_PRIVATE_KEY" > AuthKey.p8
-          xcrun altool --upload-app \
-            -f build/DigitalKuji.ipa \
-            --type ios \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID" \
-            --private-key-path AuthKey.p8
-          rm -f AuthKey.p8
+    - name: Export IPA
+      run: |
+        xcodebuild -exportArchive \
+          -archivePath build/DigitalKuji.xcarchive \
+          -exportPath build/export \
+          -exportOptionsPlist export_options.plist \
+          -allowProvisioningUpdates \
+          -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8 \
+          -authenticationKeyID WDXGY9WX55 \
+          -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
+
+    - name: Install PyJWT
+      run: pip3 install --break-system-packages PyJWT requests
+
+    - name: Submit for Review
+      run: python3 scripts/submit.py ${{ env.BUILD_NUM }}

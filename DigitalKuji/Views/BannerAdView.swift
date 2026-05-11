@@ -5,18 +5,16 @@ struct BannerAdView: UIViewRepresentable {
     let adUnitID: String
 
     func makeUIView(context: Context) -> GADBannerView {
-        let width = UIScreen.main.bounds.width
-        let adSize = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width)
-        let banner = GADBannerView(adSize: adSize)
+        let banner = GADBannerView(adSize: GADAdSizeBanner)
         banner.adUnitID = adUnitID
-        banner.rootViewController = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }?
-            .rootViewController
-        banner.load(GADRequest())
         return banner
     }
 
-    func updateUIView(_ uiView: GADBannerView, context: Context) {}
+    func updateUIView(_ uiView: GADBannerView, context: Context) {
+        guard uiView.rootViewController == nil else { return }
+        if let rootVC = uiView.window?.rootViewController {
+            uiView.rootViewController = rootVC
+            uiView.load(GADRequest())
+        }
+    }
 }

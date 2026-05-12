@@ -37,8 +37,8 @@ jobs:
 
     - name: Patch Info.plist build number
       run: |
-        sed -i "" "s|<string>\$(CURRENT_PROJECT_VERSION)</string>|<string>$BUILD_NUM</string>|" DigitalKuji/Resources/Info.plist
-        sed -i "" "/<key>CFBundleVersion<\/key>/{n;s|<string>[^<]*</string>|<string>$BUILD_NUM</string>|;}" DigitalKuji/Resources/Info.plist
+        sed -i "" "s|<string>$(CURRENT_PROJECT_VERSION)</string>|<string>$BUILD_NUM</string>|" DigitalKuji/Resources/Info.plist
+        sed -i "" "/<key>CFBundleVersion\/key>/{n;s|<string>[^<]*</string>|<string>$BUILD_NUM</string>|;}" DigitalKuji/Resources/Info.plist
         echo "Info.plist after patch:"
         grep -A1 CFBundleVersion DigitalKuji/Resources/Info.plist
 
@@ -67,28 +67,15 @@ jobs:
 
     - name: Build Archive
       run: |
-        xcodebuild archive \
-          -scheme DigitalKuji \
-          -configuration Release \
-          -destination "generic/platform=iOS" \
-          -archivePath build/DigitalKuji.xcarchive \
-          CODE_SIGN_STYLE=Automatic \
-          DEVELOPMENT_TEAM=83VGKGSQUH \
-          -allowProvisioningUpdates \
-          -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8 \
-          -authenticationKeyID WDXGY9WX55 \
-          -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
+        xcodebuild archive           -scheme DigitalKuji           -configuration Release           -destination "generic/platform=iOS"           -archivePath build/DigitalKuji.xcarchive           CODE_SIGN_STYLE=Automatic           DEVELOPMENT_TEAM=83VGKGSQUH           -allowProvisioningUpdates           -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8           -authenticationKeyID WDXGY9WX55           -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
 
     - name: Export IPA
       run: |
-        xcodebuild -exportArchive \
-          -archivePath build/DigitalKuji.xcarchive \
-          -exportPath build/export \
-          -exportOptionsPlist export_options.plist \
-          -allowProvisioningUpdates \
-          -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8 \
-          -authenticationKeyID WDXGY9WX55 \
-          -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
+        xcodebuild -exportArchive           -archivePath build/DigitalKuji.xcarchive           -exportPath build/export           -exportOptionsPlist export_options.plist           -allowProvisioningUpdates           -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_WDXGY9WX55.p8           -authenticationKeyID WDXGY9WX55           -authenticationKeyIssuerID 2be0734f-943a-4d61-9dc9-5d9045c46fec
+
+    - name: Upload IPA
+      run: |
+        xcrun altool --upload-app           --type ios           --file build/export/DigitalKuji.ipa           --apiKey WDXGY9WX55           --apiIssuer 2be0734f-943a-4d61-9dc9-5d9045c46fec           --private-key @file:/tmp/asc_key.p8
 
     - name: Install PyJWT
       run: pip3 install --break-system-packages PyJWT requests

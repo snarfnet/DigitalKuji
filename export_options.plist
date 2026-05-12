@@ -5,7 +5,7 @@
     <key>method</key>
     <string>app-store-connect</string>
     <key>destination</key>
-    <string>upload</string>
+    <string>export</string>
     <key>teamID</key>
     <string>83VGKGSQUH</string>
     <key>signingStyle</key>
@@ -14,9 +14,5 @@
     <true/>
     <key>uploadBitcode</key>
     <false/>
-    <key>apiKey</key>
-    <string>WDXGY9WX55</string>
-    <key>apiIssuer</key>
-    <string>2be0734f-943a-4d61-9dc9-5d9045c46fec</string>
 </dict>
 </plist>

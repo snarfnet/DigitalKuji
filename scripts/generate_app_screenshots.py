@@ -2,6 +2,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 OUT = Path("MarketingAssets/Screenshots")
+BG_ASSET = Path("DigitalKuji/Resources/Assets.xcassets/OmikujiBackground.imageset/omikuji-background.png")
 
 SIZES = {
     "iphone67": (1290, 2796),
@@ -9,13 +10,14 @@ SIZES = {
     "ipad129": (2048, 2732),
 }
 
-RED = (214, 37, 37)
-DARK_RED = (128, 12, 12)
-BG = (248, 248, 250)
-TEXT = (24, 24, 27)
-SUB = (108, 108, 114)
-LINE = (226, 226, 232)
-PANEL = (255, 255, 255)
+RED = (196, 31, 22)
+DARK_RED = (112, 12, 10)
+BG = (250, 245, 236)
+TEXT = (39, 30, 24)
+SUB = (111, 93, 75)
+LINE = (221, 196, 145)
+PANEL = (255, 250, 239)
+GOLD = (190, 139, 48)
 
 
 def font(size, weight="regular"):
@@ -53,15 +55,34 @@ def rounded(draw, box, radius, fill, outline=None, width=1):
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
 
-def app_canvas(size):
-    img = Image.new("RGB", size, BG)
+def app_canvas(size, show_title=True):
+    if BG_ASSET.exists():
+        bg = Image.open(BG_ASSET).convert("RGB")
+        bg_ratio = bg.width / bg.height
+        ratio = size[0] / size[1]
+        if bg_ratio > ratio:
+            new_h = size[1]
+            new_w = int(new_h * bg_ratio)
+        else:
+            new_w = size[0]
+            new_h = int(new_w / bg_ratio)
+        bg = bg.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        left = (new_w - size[0]) // 2
+        top_crop = (new_h - size[1]) // 2
+        img = bg.crop((left, top_crop, left + size[0], top_crop + size[1]))
+        veil = Image.new("RGBA", size, (255, 248, 235, 145))
+        img = Image.alpha_composite(img.convert("RGBA"), veil).convert("RGB")
+    else:
+        img = Image.new("RGB", size, BG)
     draw = ImageDraw.Draw(img)
     w, h = size
     top = int(h * 0.035)
     draw.text((w * 0.08, top), "9:41", font=font(int(w * 0.035), "bold"), fill=TEXT)
     draw.text((w * 0.82, top), "5G  100%", font=font(int(w * 0.027)), fill=TEXT)
-    title_y = int(h * 0.105)
-    draw.text((w * 0.06, title_y), "デジタルくじ引き", font=font(int(w * 0.064), "bold"), fill=TEXT)
+    if show_title:
+        title_y = int(h * 0.105)
+        draw.text((w * 0.06, title_y - int(w * 0.038)), "DIGITAL KUJI", font=font(int(w * 0.022), "bold"), fill=SUB)
+        draw.text((w * 0.06, title_y), "デジタルくじ引き", font=font(int(w * 0.064), "bold"), fill=TEXT)
     return img, draw
 
 
@@ -69,14 +90,14 @@ def segmented(draw, w, y, active):
     x = int(w * 0.06)
     seg_w = int(w * 0.88)
     seg_h = int(w * 0.09)
-    rounded(draw, (x, y, x + seg_w, y + seg_h), int(seg_h / 3), (232, 232, 237))
+    rounded(draw, (x, y, x + seg_w, y + seg_h), int(seg_h / 3), (255, 248, 235), LINE, 2)
     labels = ["数字", "色", "テキスト"]
     cell = seg_w / 3
     for i, label in enumerate(labels):
         lx = x + int(cell * i)
         if i == active:
-            rounded(draw, (lx + 5, y + 5, int(lx + cell - 5), y + seg_h - 5), int(seg_h / 3), PANEL)
-        centered(draw, (lx + cell / 2, y + seg_h / 2), label, font(int(w * 0.034), "bold" if i == active else "regular"), TEXT)
+            rounded(draw, (lx + 5, y + 5, int(lx + cell - 5), y + seg_h - 5), int(seg_h / 3), RED)
+        centered(draw, (lx + cell / 2, y + seg_h / 2), label, font(int(w * 0.034), "bold"), (255, 255, 255) if i == active else TEXT)
 
 
 def nav_draw_screen(draw, w, h):
@@ -184,7 +205,7 @@ def text_setup(size):
 
 
 def draw_result(size):
-    img, draw = app_canvas(size)
+    img, draw = app_canvas(size, show_title=False)
     w, h = size
     nav_draw_screen(draw, w, h)
     top_y = int(h * 0.16)

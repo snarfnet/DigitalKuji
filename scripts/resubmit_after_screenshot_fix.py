@@ -9,7 +9,7 @@ KEY_ID = os.environ.get("ASC_KEY_ID", "WDXGY9WX55")
 ISSUER = os.environ.get("ASC_ISSUER_ID", "2be0734f-943a-4d61-9dc9-5d9045c46fec")
 P8_PATH = os.environ.get("ASC_P8_PATH", "/tmp/asc_key.p8")
 APP_ID = os.environ.get("APP_ID", "6766037910")
-VERSION = os.environ.get("APP_VERSION", "1.0")
+VERSION = os.environ.get("APP_VERSION", "1.1")
 SCREENSHOT_DIR = "MarketingAssets/Screenshots"
 
 SCREENSHOT_GROUPS = [

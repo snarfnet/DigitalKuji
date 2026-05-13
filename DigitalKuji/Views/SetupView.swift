@@ -15,54 +15,127 @@ struct SetupView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Picker("モード", selection: $manager.mode) {
-                    ForEach(KujiMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding()
+            ZStack {
+                OmikujiScreenBackground()
 
-                ScrollView {
-                    VStack(spacing: 20) {
-                        switch manager.mode {
-                        case .number: NumberSetupView(manager: manager)
-                        case .color:  ColorSetupView(manager: manager)
-                        case .text:   TextSetupView(manager: manager, newText: $newText)
+                VStack(spacing: 0) {
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            header
+                            modeSelector
+
+                            switch manager.mode {
+                            case .number: NumberSetupView(manager: manager)
+                            case .color:  ColorSetupView(manager: manager)
+                            case .text:   TextSetupView(manager: manager, newText: $newText)
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 24)
+                        .padding(.bottom, 110)
                     }
-                    .padding()
-                }
 
-                Button {
-                    manager.setup()
-                    navigate = true
-                } label: {
-                    HStack {
-                        Image(systemName: "play.fill")
-                        Text("開始する").fontWeight(.bold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(canStart ? Color.red : Color.gray)
-                    .foregroundColor(.white)
-                    .cornerRadius(16)
-                    .padding(.horizontal)
-                    .padding(.bottom, 12)
-                }
-                .disabled(!canStart)
-                .navigationDestination(isPresented: $navigate) {
-                    DrawView(manager: manager)
+                    startButton
                 }
             }
-            .navigationTitle("デジタルくじ引き")
-            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $navigate) {
+                DrawView(manager: manager)
+            }
+        }
+    }
+
+    var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(KujiTheme.goldGradient)
+                Text("DIGITAL KUJI")
+                    .font(.caption.weight(.bold))
+                    .tracking(1.6)
+                    .foregroundStyle(KujiTheme.mutedInk)
+            }
+
+            Text("デジタルくじ引き")
+                .font(.system(size: 36, weight: .heavy, design: .rounded))
+                .foregroundStyle(KujiTheme.ink)
+
+            Text("数字・色・テキストから、今すぐ抽選。")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(KujiTheme.mutedInk)
+        }
+        .padding(.top, 6)
+    }
+
+    var modeSelector: some View {
+        HStack(spacing: 8) {
+            ForEach(KujiMode.allCases) { mode in
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                        manager.mode = mode
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: icon(for: mode))
+                            .font(.system(size: 13, weight: .bold))
+                        Text(mode.rawValue)
+                            .font(.subheadline.weight(.bold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(manager.mode == mode ? Color.white : KujiTheme.ink)
+                    .background {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(manager.mode == mode ? KujiTheme.vermilion : Color.white.opacity(0.58))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(manager.mode == mode ? KujiTheme.gold.opacity(0.75) : KujiTheme.paperLine.opacity(0.45), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    var startButton: some View {
+        Button {
+            manager.setup()
+            navigate = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "seal.fill")
+                Text("くじをはじめる")
+                    .fontWeight(.heavy)
+            }
+            .font(.system(size: 18, design: .rounded))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(canStart ? KujiTheme.cardGradient : LinearGradient(colors: [.gray.opacity(0.55), .gray.opacity(0.45)], startPoint: .leading, endPoint: .trailing))
+            .foregroundColor(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.white.opacity(0.35), lineWidth: 1)
+            )
+            .shadow(color: KujiTheme.deepRed.opacity(canStart ? 0.26 : 0), radius: 16, y: 8)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .background(.ultraThinMaterial)
+        }
+        .disabled(!canStart)
+    }
+
+    func icon(for mode: KujiMode) -> String {
+        switch mode {
+        case .number: return "number.circle.fill"
+        case .color: return "paintpalette.fill"
+        case .text: return "textformat"
         }
     }
 }
-
-// MARK: - 数字モード
 
 struct NumberSetupView: View {
     @ObservedObject var manager: KujiManager
@@ -70,108 +143,91 @@ struct NumberSetupView: View {
     var count: Int { max(0, manager.numberMax - manager.numberMin + 1) }
 
     var body: some View {
-        VStack(spacing: 16) {
-            GroupBox("範囲設定") {
+        PaperPanel {
+            VStack(alignment: .leading, spacing: 18) {
+                SectionTitle(icon: "slider.horizontal.3", title: "範囲設定", caption: "\(count) 枚のくじ")
+
                 VStack(spacing: 12) {
-                    HStack {
-                        Text("最小")
-                        Spacer()
-                        Stepper("\(manager.numberMin)",
-                                value: $manager.numberMin,
-                                in: 1...99)
-                    }
-                    Divider()
-                    HStack {
-                        Text("最大")
-                        Spacer()
-                        Stepper("\(manager.numberMax)",
-                                value: $manager.numberMax,
-                                in: 2...100)
-                    }
+                    numberRow(title: "最小", value: $manager.numberMin, range: 1...99)
+                    Divider().overlay(KujiTheme.paperLine.opacity(0.5))
+                    numberRow(title: "最大", value: $manager.numberMax, range: 2...100)
                 }
-                .padding(.vertical, 4)
-            }
 
-            if count > 0 {
-                Text("\(count) 枚のくじが入ります")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-
-                if count <= 30 {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 8) {
+                if count > 0 && count <= 30 {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
                         ForEach(manager.numberMin...manager.numberMax, id: \.self) { n in
-                            Text("\(n)")
-                                .frame(width: 44, height: 44)
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(8)
-                                .font(.system(.body, design: .rounded).weight(.semibold))
+                            KujiTicketLabel(text: "\(n)")
                         }
                     }
+                    .padding(.top, 2)
                 }
             }
         }
     }
-}
 
-// MARK: - 色モード
+    func numberRow(title: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(KujiTheme.ink)
+            Spacer()
+            Stepper(value: value, in: range) {
+                Text("\(value.wrappedValue)")
+                    .font(.title3.weight(.heavy))
+                    .foregroundStyle(KujiTheme.vermilion)
+                    .frame(minWidth: 42)
+            }
+            .tint(KujiTheme.vermilion)
+        }
+    }
+}
 
 struct ColorSetupView: View {
     @ObservedObject var manager: KujiManager
 
-    let columns = Array(repeating: GridItem(.flexible()), count: 4)
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("使う色を選んでください")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        PaperPanel {
+            VStack(alignment: .leading, spacing: 18) {
+                SectionTitle(icon: "paintpalette.fill", title: "色を選ぶ", caption: "\(manager.selectedColorIDs.count) 色選択中")
 
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(KujiColorOption.all) { option in
-                    let selected = manager.selectedColorIDs.contains(option.id)
-                    Button {
-                        if selected {
-                            manager.selectedColorIDs.remove(option.id)
-                        } else {
-                            manager.selectedColorIDs.insert(option.id)
-                        }
-                    } label: {
-                        VStack(spacing: 6) {
-                            ZStack {
-                                Circle()
-                                    .fill(option.color)
-                                    .frame(width: 58, height: 58)
-                                    .overlay(
-                                        Circle().strokeBorder(
-                                            selected ? Color.primary : Color.gray.opacity(0.3),
-                                            lineWidth: selected ? 3 : 1
-                                        )
-                                    )
-                                if selected {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(
-                                            ["yellow", "cyan"].contains(option.id) ? .black : .white
-                                        )
-                                }
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(KujiColorOption.all) { option in
+                        let selected = manager.selectedColorIDs.contains(option.id)
+                        Button {
+                            if selected {
+                                manager.selectedColorIDs.remove(option.id)
+                            } else {
+                                manager.selectedColorIDs.insert(option.id)
                             }
-                            Text(option.name)
-                                .font(.caption)
-                                .foregroundColor(.primary)
+                        } label: {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(option.color)
+                                        .frame(width: 58, height: 58)
+                                        .shadow(color: option.color.opacity(0.28), radius: 8, y: 4)
+                                        .overlay(Circle().stroke(Color.white.opacity(0.75), lineWidth: 2))
+                                        .overlay(Circle().stroke(selected ? KujiTheme.gold : Color.clear, lineWidth: 4))
+                                    if selected {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 18, weight: .heavy))
+                                            .foregroundColor(["yellow", "cyan"].contains(option.id) ? .black : .white)
+                                    }
+                                }
+                                Text(option.name)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(KujiTheme.ink)
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
-
-            Text("\(manager.selectedColorIDs.count) 色選択中")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
         }
     }
 }
-
-// MARK: - テキストモード
 
 struct TextSetupView: View {
     @ObservedObject var manager: KujiManager
@@ -179,59 +235,62 @@ struct TextSetupView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("くじに入れる項目を追加してください")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        PaperPanel {
+            VStack(alignment: .leading, spacing: 16) {
+                SectionTitle(icon: "textformat", title: "項目を入れる", caption: "自由なくじを作成")
 
-            HStack {
-                TextField("例: 田中、Aチーム...", text: $newText)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($focused)
-                    .onSubmit { addItem() }
+                HStack(spacing: 10) {
+                    TextField("例: Aチーム", text: $newText)
+                        .textFieldStyle(.plain)
+                        .font(.body.weight(.medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 13)
+                        .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .stroke(KujiTheme.paperLine.opacity(0.5), lineWidth: 1)
+                        )
+                        .focused($focused)
+                        .onSubmit { addItem() }
 
-                Button(action: addItem) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.red)
+                    Button(action: addItem) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(width: 48, height: 48)
+                            .background(KujiTheme.vermilion, in: Circle())
+                    }
+                    .disabled(newText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-                .disabled(newText.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
 
-            if manager.textItems.isEmpty {
-                Text("まだ項目がありません")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(manager.textItems.indices, id: \.self) { i in
-                        HStack {
-                            Image(systemName: "ticket")
-                                .foregroundColor(.red)
-                            Text(manager.textItems[i])
-                            Spacer()
-                            Button {
-                                manager.textItems.remove(at: i)
-                            } label: {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundColor(.red.opacity(0.7))
+                if manager.textItems.isEmpty {
+                    Text("まだ項目がありません")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(KujiTheme.mutedInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 28)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(manager.textItems.indices, id: \.self) { i in
+                            HStack {
+                                Image(systemName: "ticket.fill")
+                                    .foregroundStyle(KujiTheme.gold)
+                                Text(manager.textItems[i])
+                                    .font(.body.weight(.bold))
+                                    .foregroundStyle(KujiTheme.ink)
+                                Spacer()
+                                Button {
+                                    manager.textItems.remove(at: i)
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundColor(KujiTheme.vermilion.opacity(0.78))
+                                }
                             }
-                        }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 4)
-
-                        if i < manager.textItems.count - 1 {
-                            Divider()
+                            .padding(12)
+                            .background(Color.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                     }
                 }
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-
-                Text("全 \(manager.textItems.count) 枚")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
             }
         }
     }
@@ -241,5 +300,39 @@ struct TextSetupView: View {
         guard !trimmed.isEmpty else { return }
         manager.textItems.append(trimmed)
         newText = ""
+    }
+}
+
+struct SectionTitle: View {
+    let icon: String
+    let title: String
+    let caption: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Label(title, systemImage: icon)
+                .font(.headline.weight(.heavy))
+                .foregroundStyle(KujiTheme.ink)
+            Spacer()
+            Text(caption)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(KujiTheme.mutedInk)
+        }
+    }
+}
+
+struct KujiTicketLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(.body, design: .rounded).weight(.heavy))
+            .foregroundStyle(KujiTheme.vermilion)
+            .frame(maxWidth: .infinity, minHeight: 46)
+            .background(KujiTheme.paper.opacity(0.88), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(KujiTheme.gold.opacity(0.38), lineWidth: 1)
+            )
     }
 }
